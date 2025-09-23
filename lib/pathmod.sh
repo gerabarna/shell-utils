@@ -4,11 +4,11 @@
 if ! type path &> /dev/null ; then
 	interpreter=$(ps -p $$ -o comm=)
 	if [[ $interpreter == *"zsh" ]]; then
-		source_dir="${(%):h}/lib"
+		source_dir="${0:h}"
 	else
 		source_dir=$(dirname ${BASH_SOURCE[0]})
 	fi
-	path_script_path=$(realpath "$source_dir/path.sh")
+	path_script_path="$source_dir/path.sh"
 	if [[ -e "$path_script_path" ]]; then
 		source "$path_script_path"
 	else
