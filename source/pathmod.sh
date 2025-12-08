@@ -17,28 +17,7 @@ if ! type path &> /dev/null ; then
 	unset source_dir interpreter path_script_path
 fi
 
-declare -A PATHMOD_KNOWN_PATHS
-export PATHMOD_KNOWN_PATHS
-
-function _pathmod_loop_args(){
-	local options=$1; shift
-	local key=$1; shift
-	local mods=${PATHMOD_KNOWN_PATHS[$key]}
-	if [[ -z "$mods" ]]; then
-		>&2 echo "Unknown mod=$key"
-		return 2
-	fi
-	# we need to allow multiple paths for a single key -> its a space separated list
-	local interpreter=$(ps -p $$ -o comm=)
-	if [[ $interpreter == *"zsh" ]]; then
-		mods_array=("${(@s/ /)mods}")
-	else
-		read -r -a mods_array <<< "$mods"
-	fi
-	for mod in "${mods_array[@]}"; do
-		path $options $mod
-	done
-}
+[[ ! -v PATHMOD_KNOWN_PATHS ]] && declare PATHMOD_KNOWN_PATHS; export PATHMOD_KNOWN_PATHS
 
 function pathmod() {
 	local help="
@@ -57,48 +36,54 @@ Commands:
 	list
 		list all known key-path pairs
 "
-	local interpreter=$(ps -p $$ -o comm=)
-	case "$1" in
-		load)
-			shift
-			for key in "$@"; do
-				_pathmod_loop_args -p "$key"
+	local mode="$1";
+	shift
+	
+	local entry_delimiter="|"
+	local key_value_delimiter=":"
 
-				if [[ $interpreter == *"zsh" ]]; then
-					#eval "rehash" # bash will complain if rehash is without eval
-					rehash
-				else
-					hash -r
-				fi
+	if [[ "$mode" == "add" ]]; then
+		argument_key=$1
+		shift
+		argument_value=$(tr ' ' "$key_value_delimiter" <<< "$@")
 
-			done
-			;;
-		unload)
-			shift
-			for key in "$@"; do
-				_pathmod_loop_args -r "$key"
-				hash -r
-			done
-			;;
-		add)
-			shift
-			key=$1; shift
-			PATHMOD_KNOWN_PATHS[$key]="$@"
-			;;
-		list)
-			if [[ $interpreter == *"zsh" ]]; then
-				for key in "${(k)PATHMOD_KNOWN_PATHS[@]}"; do
-					echo "$key: ${PATHMOD_KNOWN_PATHS[$key]}"
-				done
-			else
-				for key in "${!PATHMOD_KNOWN_PATHS[@]}"; do
-					echo "$key: ${PATHMOD_KNOWN_PATHS[$key]}"
-				done
+		unset new_path
+		while read -r next_path; do
+			local key=$(cut -d"$key_value_delimiter" -f1 <<< "$next_path")
+			local value=${next_path#*"$key_value_delimiter"}
+			if [[ ! "$key" == "$argument_key" ]] && [[ ! "$key" == "" ]]; then
+				[[ -n $new_path ]] && new_path="$new_path$entry_delimiter"
+				new_path="$new_path$key$key_value_delimiter$value";
 			fi
+		done < <(tr "$entry_delimiter" '\n' <<< "$PATHMOD_KNOWN_PATHS")
 
-			;;
-		*)
-			>&2 echo "$help"
-			return 1;;
-	esac
+		[[ -n $new_path ]] && new_path="$new_path$entry_delimiter"
+		PATHMOD_KNOWN_PATHS="$new_path$argument_key$key_value_delimiter$argument_value"
+		export PATHMOD_KNOWN_PATHS
+		return 0
+	fi
+
+	while read -r next_path; do
+		local key=$(cut -d"$key_value_delimiter" -f1 <<< "$next_path")
+		local value=${next_path#*"$key_value_delimiter"}
+    if [[ -z $value ]]; then
+        continue;
+    fi
+		case "$mode" in
+			load)
+				for argument_key in "$@"; do
+					if [[ "$argument_key" == "$key" ]]; then
+						eval path -p $(sed "s|$key_value_delimiter| -p |g" <<< $value)
+					fi
+				done;;
+			unload)
+				for argument_key in "$@"; do
+					[[ "$argument_key" == "$key" ]] && eval path -r $(sed "s|$key_value_delimiter| -r |g" <<< $value)
+				done;;
+			list) echo "$key:$value";;
+			*)
+				>&2 echo "$help"
+				return 1;;
+		esac
+	done < <(tr "$entry_delimiter" '\n' <<< "$PATHMOD_KNOWN_PATHS")
 }
