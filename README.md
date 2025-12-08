@@ -1,7 +1,7 @@
 Common shell utilities I find useful/handy to have around
 
 ## Structure
-commands find in the  [lib](./lib) subfolder contain useful functions 
+commands find in the  [lib](source) subfolder contain useful functions 
 and should be sourced, rather than invoked directly
 
 commands in the [bin](./bin) folder are meant to be executed directly
