@@ -1,7 +1,7 @@
-#!/usr/bin/env zsh
+#! /bin/echo "This script should be sourced and not executed directly"
 
 function path() {
-	local help="
+  local help="
 Usage: 	
 	path [-o <arg>]... [-o] [<arg>]...
 	In case no arguments are supplied the tool simply prints the current contents of the PATH variable.

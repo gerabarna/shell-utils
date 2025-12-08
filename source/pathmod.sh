@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#! /bin/echo "This script should be sourced and not executed directly"
 
 #make sure path.sh was sourced, as we rely on it
 if ! type path &> /dev/null ; then
