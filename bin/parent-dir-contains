@@ -1,0 +1,71 @@
+#!/usr/bin/env zsh
+
+set -euo pipefail
+
+readonly help="
+Description:
+	Simple search utility to find if file is present in a path hierarchy
+Usage:
+	path <the searched file name> [directories to search...]
+	The searched directories are optional. In case no directories supplied the current working directory is searched
+Options:
+	-v
+		Verbose mode mostly useful for debugging purposes
+	-h
+		prints this simple help
+"
+
+function main() {
+	local target_file=$1
+	shift;
+	case $# in
+		0)
+			local search_dir=$(pwd)
+			main $target_file $search_dir
+			;;
+		1)
+			local search_dir=$1;
+			if [[ -e $search_dir/.tool-versions ]]; then
+				return 0;
+			else
+				local parent_dir=$(dirname $search_dir)
+				if $verbose; then
+				  echo "parent=$parent_dir search=$search_dir"
+				fi
+				if [[ "$parent_dir" == "$search_dir" ]]; then
+					return 1;
+				fi
+				main $target_file $parent_dir
+				return $?
+			fi
+			;;
+		*)
+			for dir in "$@"; do
+			    if main $target_file $dir; then
+						return 0;
+			    fi
+			done
+			return 1
+			;;
+	esac
+}
+
+verbose=false
+OPTIND=1
+while getopts "hv" opt; do
+	case $opt in
+		v) verbose=true;;
+		h) echo "$help"; return 0;;
+		*)
+			>&2 echo "$help"
+			return 2;;
+	esac
+done
+
+# this is stupid but without the echo it does not seem to work in zsh...
+shift $(echo $((OPTIND - 1)))
+OPTIND=1
+
+main "$@"
+#result=$?
+#return $result
